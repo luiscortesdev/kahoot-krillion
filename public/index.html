@@ -66,8 +66,10 @@
 
 </div>
 <script src="/socket.io/socket.io.js"></script>
+<script src="/sfx.js"></script>
 <script>
 const socket = io();
+SFX.addToggle();
 const $ = id => document.getElementById(id);
 function show(id) { document.querySelectorAll('section').forEach(s => s.classList.toggle('hidden', s.id !== id)); }
 let myName = '', joined = null;
@@ -110,7 +112,7 @@ function send() {
 }
 $('send').onclick = send;
 $('answer').onkeydown = e => { if (e.key === 'Enter') send(); };
-socket.on('answered', () => show('s-sent'));
+socket.on('answered', () => { show('s-sent'); SFX.play('jump'); });
 
 socket.on('result', r => {
   clearInterval(tick);
@@ -122,12 +124,15 @@ socket.on('result', r => {
     $('rHead').textContent = `▼ +${r.gain}m`;
     $('rDetail').textContent = r.sameCount === 1 ? `Only YOU said “${r.answer}”!` : `${r.sameCount} krill said “${r.answer}”`;
   }
+  if (!r.answer || !r.valid) SFX.play('death');
+  else if (r.sameCount === 1) SFX.play('explosion'); // unique answer — big moment
   $('rDepth').textContent = `${r.depth}m`;
   $('rRank').textContent = `#${r.rank} of ${r.of}`;
 });
 
 socket.on('gameover', ({ ranking }) => {
   show('s-end');
+  SFX.play('gameover');
   const i = ranking.findIndex(p => p.name === myName);
   const me = ranking[i];
   $('eIcon').textContent = ['🥇', '🥈', '🥉'][i] || '🦐';

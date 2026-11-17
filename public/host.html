@@ -77,8 +77,10 @@
 
 </div>
 <script src="/socket.io/socket.io.js"></script>
+<script src="/sfx.js"></script>
 <script>
 const socket = io();
+SFX.addToggle();
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function show(id) { document.querySelectorAll('section').forEach(s => s.classList.toggle('hidden', s.id !== id)); }
@@ -130,7 +132,10 @@ $('create').onclick = () => {
 };
 
 // ---------- lobby ----------
+let lobbyCount = 0;
 socket.on('lobby', ({ players }) => {
+  if (players.length > lobbyCount && !$('s-lobby').classList.contains('hidden')) SFX.play('jump'); // a krill joined
+  lobbyCount = players.length;
   $('pcount').textContent = players.length;
   $('start').disabled = players.length === 0;
   $('lobbyPlayers').innerHTML = players.map(p => `<span class="pill" style="cursor:pointer;${p.connected ? '' : 'opacity:.4'}" data-kick="${p.id}">🦐 ${esc(p.name)}</span>`).join('');
@@ -198,6 +203,7 @@ socket.on('reveal', r => {
     if (unused.length) $('buckets').innerHTML += `<p class="muted">Nobody said: ${unused.map(esc).join(', ')}</p>`;
   }
   renderOcean(r.ranking);
+  SFX.play(r.best ? 'explosion' : 'death'); // splash as krill dive, or a sad sound if nobody did
   // countdown until the game auto-continues
   const what = r.index >= r.total - 1 ? 'Final results' : 'Next question';
   $('pause').classList.remove('hidden');
@@ -216,6 +222,7 @@ $('pause').onclick = () => {
 socket.on('gameover', ({ ranking }) => {
   clearInterval(tick);
   show('s-end');
+  SFX.play('gameover');
   const [a, b, c] = ranking;
   const slot = (p, cls, medal) => p ? `<div class="${cls}"><div style="font-size:2.5rem">${medal}</div><b>${esc(p.name)}</b><div>${p.depth}m</div></div>` : '';
   $('podium').innerHTML = slot(b, 'p2', '🥈') + slot(a, 'p1', '🥇') + slot(c, 'p3', '🥉');
