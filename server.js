@@ -8,6 +8,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 const PORT = process.env.PORT || 3000;
+const REVEAL_SECONDS = +process.env.REVEAL_SECONDS || 8; // how long results show before auto-continuing
 
 app.use(express.static(__dirname + '/public'));
 app.get('/host', (_, res) => res.sendFile(__dirname + '/public/host.html'));
@@ -104,15 +105,36 @@ function endQuestion(g) {
     .map(b => ({ label: b.label, valid: b.valid, count: b.ids.length }))
     .sort((a, b) => (b.valid - a.valid) || (a.count - b.count));
 
+  // Auto-continue: show the results briefly, then move on by itself
+  g.paused = false;
+  g.timer = setTimeout(() => advance(g), REVEAL_SECONDS * 1000);
+
   io.to(g.host).emit('reveal', {
     index: g.qIndex, total: g.questions.length, text: q.text,
     buckets: buckList, ranking, best, answeredCount: Object.keys(g.answers).length,
-    accepted: accepted.map(a => a.label),
+    accepted: accepted.map(a => a.label), nextAt: Date.now() + REVEAL_SECONDS * 1000,
   });
   ranking.forEach((r, i) => {
     const res = results[r.id] || { gain: 0, answer: null, valid: false, sameCount: 0 };
     io.to(r.id).emit('result', { ...res, depth: r.depth, rank: i + 1, of: ranking.length, last: g.qIndex >= g.questions.length - 1 });
   });
+}
+
+// Go to the next question, or to the final results after the last one
+function advance(g) {
+  if (g.phase !== 'reveal') return;
+  clearTimeout(g.timer);
+  if (g.qIndex >= g.questions.length - 1) return endGame(g);
+  g.qIndex++;
+  startQuestion(g);
+}
+
+// End the question early once every connected player has answered
+function checkAllAnswered(g) {
+  if (g.phase !== 'question') return;
+  const active = Object.keys(g.players).filter(id => g.players[id].connected);
+  io.to(g.host).emit('progress', { answered: Object.keys(g.answers).length, total: active.length });
+  if (active.length && active.every(id => g.answers[id])) endQuestion(g);
 }
 
 function endGame(g) {
@@ -149,10 +171,15 @@ io.on('connection', socket => {
 
   socket.on('host:next', () => {
     const g = games[socket.data.hostOf];
-    if (!g || g.phase !== 'reveal') return;
-    if (g.qIndex >= g.questions.length - 1) return endGame(g);
-    g.qIndex++;
-    startQuestion(g);
+    if (g) advance(g);
+  });
+
+  // Teacher can pause the auto-continue on the results screen (e.g. to discuss answers)
+  socket.on('host:pause', () => {
+    const g = games[socket.data.hostOf];
+    if (!g || g.phase !== 'reveal' || g.paused) return;
+    g.paused = true;
+    clearTimeout(g.timer);
   });
 
   socket.on('host:kick', id => {
@@ -193,9 +220,7 @@ io.on('connection', socket => {
     if (!norm(raw)) return;
     g.answers[socket.id] = { raw, t: Date.now() };
     socket.emit('answered');
-    const active = Object.values(g.players).filter(p => p.connected).length;
-    io.to(g.host).emit('progress', { answered: Object.keys(g.answers).length, total: active });
-    if (Object.keys(g.answers).length >= active) endQuestion(g);
+    checkAllAnswered(g);
   });
 
   socket.on('disconnect', () => {
@@ -209,6 +234,7 @@ io.on('connection', socket => {
         if (g.phase === 'lobby') delete g.players[socket.id];
         else g.players[socket.id].connected = false;
         broadcastLobby(g);
+        checkAllAnswered(g); // a player leaving may mean everyone remaining has answered
       }
     }
   });

@@ -56,6 +56,8 @@
   <section id="s-reveal" class="hidden">
     <div class="row">
       <div class="grow"><div class="muted" id="rnum"></div><div class="big" id="rtext"></div></div>
+      <span class="muted" id="autoNext"></span>
+      <button class="ghost" id="pause">⏸ Pause</button>
       <button id="next">Next ▶</button>
     </div>
     <div class="card" id="bestBox"></div>
@@ -196,11 +198,23 @@ socket.on('reveal', r => {
     if (unused.length) $('buckets').innerHTML += `<p class="muted">Nobody said: ${unused.map(esc).join(', ')}</p>`;
   }
   renderOcean(r.ranking);
+  // countdown until the game auto-continues
+  const what = r.index >= r.total - 1 ? 'Final results' : 'Next question';
+  $('pause').classList.remove('hidden');
+  const upd = () => { $('autoNext').textContent = `${what} in ${Math.max(0, Math.ceil((r.nextAt - Date.now()) / 1000))}s`; };
+  upd(); tick = setInterval(upd, 200);
 });
 $('next').onclick = () => socket.emit('host:next');
+$('pause').onclick = () => {
+  socket.emit('host:pause');
+  clearInterval(tick);
+  $('autoNext').textContent = 'Paused — click Next when ready';
+  $('pause').classList.add('hidden');
+};
 
 // ---------- end ----------
 socket.on('gameover', ({ ranking }) => {
+  clearInterval(tick);
   show('s-end');
   const [a, b, c] = ranking;
   const slot = (p, cls, medal) => p ? `<div class="${cls}"><div style="font-size:2.5rem">${medal}</div><b>${esc(p.name)}</b><div>${p.depth}m</div></div>` : '';
