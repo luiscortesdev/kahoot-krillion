@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Krillion — Join</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap center" style="max-width:520px">
+
+  <section id="s-join">
+    <div class="logo" style="margin-top:8vh">🦐 Krill<span>ion</span></div>
+    <div class="card">
+      <input id="code" inputmode="numeric" maxlength="6" placeholder="Game PIN" style="text-align:center;font-size:1.6rem;font-weight:800">
+      <div style="height:10px"></div>
+      <input id="name" maxlength="16" placeholder="Nickname" style="text-align:center;font-size:1.3rem">
+      <div style="height:12px"></div>
+      <button id="join" style="width:100%">Dive in!</button>
+      <div class="err" id="joinErr"></div>
+    </div>
+    <a href="/host" class="muted" style="color:inherit">I'm the teacher →</a>
+  </section>
+
+  <section id="s-wait" class="hidden">
+    <div style="font-size:5rem;margin-top:12vh" class="krillbob">🦐</div>
+    <div class="big">You're in, <span id="me"></span>!</div>
+    <p class="muted" id="waitMsg">See your name on the big screen? Waiting for the teacher to start…</p>
+  </section>
+
+  <section id="s-question" class="hidden">
+    <div class="muted" id="qnum"></div>
+    <div class="card"><div class="big" id="qtext"></div></div>
+    <div class="timer" id="timer" style="width:80px;height:80px;font-size:2rem"></div>
+    <div class="card">
+      <input id="answer" maxlength="60" placeholder="Your rarest answer…" autocomplete="off" style="font-size:1.3rem;text-align:center">
+      <div style="height:10px"></div>
+      <button id="send" style="width:100%">Submit</button>
+    </div>
+    <p class="muted">Think of something nobody else will say — and be quick!</p>
+  </section>
+
+  <section id="s-sent" class="hidden">
+    <div style="font-size:4rem;margin-top:12vh">🫧</div>
+    <div class="big">Answer locked in!</div>
+    <p class="muted">Hoping you're the only one who said it…</p>
+  </section>
+
+  <section id="s-result" class="hidden">
+    <div style="font-size:4rem;margin-top:8vh" id="rIcon"></div>
+    <div class="big" id="rHead"></div>
+    <div class="card">
+      <div id="rDetail"></div>
+      <div class="huge" style="font-size:3rem" id="rDepth"></div>
+      <div class="muted">total depth</div>
+      <div class="big" id="rRank"></div>
+    </div>
+    <p class="muted">Eyes on the big screen!</p>
+  </section>
+
+  <section id="s-end" class="hidden">
+    <div style="font-size:5rem;margin-top:10vh" id="eIcon"></div>
+    <div class="big" id="eHead"></div>
+    <div class="card"><div class="huge" style="font-size:3rem" id="eDepth"></div><div class="muted">final depth</div></div>
+    <button onclick="location.reload()">Play again</button>
+  </section>
+
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const $ = id => document.getElementById(id);
+function show(id) { document.querySelectorAll('section').forEach(s => s.classList.toggle('hidden', s.id !== id)); }
+let myName = '', joined = null;
+
+const params = new URLSearchParams(location.search);
+if (params.get('pin')) $('code').value = params.get('pin');
+try { $('name').value = localStorage.getItem('krillion-name') || ''; } catch {}
+
+function join(code, name) {
+  socket.emit('player:join', { code, name }, res => {
+    if (res.error) { show('s-join'); return $('joinErr').textContent = res.error; }
+    myName = res.name; joined = { code, name };
+    try { localStorage.setItem('krillion-name', name); } catch {}
+    $('me').textContent = myName;
+    show('s-wait');
+  });
+}
+$('join').onclick = () => join($('code').value.trim(), $('name').value.trim());
+$('name').onkeydown = e => { if (e.key === 'Enter') $('join').click(); };
+$('code').onkeydown = e => { if (e.key === 'Enter') $('name').focus(); };
+
+// auto-rejoin if the phone's connection blips mid-game
+socket.on('connect', () => { if (joined) join(joined.code, joined.name); });
+
+let tick;
+socket.on('question', q => {
+  show('s-question');
+  $('qnum').textContent = `Question ${q.index + 1} of ${q.total}`;
+  $('qtext').textContent = q.text;
+  $('answer').value = ''; $('send').disabled = false;
+  setTimeout(() => $('answer').focus(), 50);
+  clearInterval(tick);
+  const upd = () => { $('timer').textContent = Math.max(0, Math.ceil((q.endsAt - Date.now()) / 1000)); };
+  upd(); tick = setInterval(upd, 200);
+});
+function send() {
+  const a = $('answer').value.trim(); if (!a) return;
+  $('send').disabled = true;
+  socket.emit('player:answer', a);
+}
+$('send').onclick = send;
+$('answer').onkeydown = e => { if (e.key === 'Enter') send(); };
+socket.on('answered', () => show('s-sent'));
+
+socket.on('result', r => {
+  clearInterval(tick);
+  show('s-result');
+  if (!r.answer) { $('rIcon').textContent = '⏰'; $('rHead').textContent = 'No answer!'; $('rDetail').textContent = 'You floated in place.'; }
+  else if (!r.valid) { $('rIcon').textContent = '❌'; $('rHead').textContent = 'Not an accepted answer'; $('rDetail').textContent = `“${r.answer}” didn't count.`; }
+  else {
+    $('rIcon').textContent = r.sameCount === 1 ? '💎' : '🦐';
+    $('rHead').textContent = `▼ +${r.gain}m`;
+    $('rDetail').textContent = r.sameCount === 1 ? `Only YOU said “${r.answer}”!` : `${r.sameCount} krill said “${r.answer}”`;
+  }
+  $('rDepth').textContent = `${r.depth}m`;
+  $('rRank').textContent = `#${r.rank} of ${r.of}`;
+});
+
+socket.on('gameover', ({ ranking }) => {
+  show('s-end');
+  const i = ranking.findIndex(p => p.name === myName);
+  const me = ranking[i];
+  $('eIcon').textContent = ['🥇', '🥈', '🥉'][i] || '🦐';
+  $('eHead').textContent = i === 0 ? 'You are the DEEPEST KRILL!' : `You finished #${i + 1} of ${ranking.length}`;
+  $('eDepth').textContent = me ? `${me.depth}m` : '';
+});
+
+socket.on('kicked', () => { joined = null; show('s-join'); $('joinErr').textContent = 'You were removed by the teacher.'; });
+socket.on('hostleft', () => { joined = null; show('s-join'); $('joinErr').textContent = 'The teacher ended the game.'; });
+</script>
+</body>
+</html>

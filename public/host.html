@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Krillion — Teacher</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 1. Question editor -->
+  <section id="s-edit">
+    <div class="logo center">🦐 Krill<span>ion</span></div>
+    <p class="center muted">Rare answers + fast answers = deeper dives. Deepest krill wins.</p>
+    <div class="card">
+      <h2>Your questions</h2>
+      <p class="muted">Ask open-ended questions with many possible answers (e.g. "Name a planet"). List the accepted answers separated by commas — or leave it blank to accept anything. Players who give an answer nobody else gave sink the deepest.</p>
+      <div id="qlist"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="ghost" id="add">+ Add question</button>
+        <button class="ghost" id="exportBtn">Export</button>
+        <button class="ghost" id="importBtn">Import</button>
+        <div class="grow"></div>
+        <button id="create">Create game ▶</button>
+      </div>
+      <div class="err" id="editErr"></div>
+    </div>
+  </section>
+
+  <!-- 2. Lobby -->
+  <section id="s-lobby" class="hidden center">
+    <div class="card">
+      <div class="big">Join at <span id="joinUrl" style="color:#fde68a"></span></div>
+      <div class="muted">Game PIN:</div>
+      <div class="huge" id="pin"></div>
+    </div>
+    <div class="row" style="justify-content:center">
+      <div class="big"><span id="pcount">0</span> krill in the swarm</div>
+      <button id="start" disabled>Start dive ▶</button>
+    </div>
+    <div id="lobbyPlayers" class="card" style="min-height:120px"></div>
+    <p class="muted">Click a name to remove a player.</p>
+  </section>
+
+  <!-- 3. Question -->
+  <section id="s-question" class="hidden center">
+    <div class="muted" id="qnum"></div>
+    <div class="card"><div class="big" id="qtext"></div></div>
+    <div class="timer" id="timer"></div>
+    <p class="big"><span id="answered">0</span> answers in</p>
+    <p class="muted">Type your rarest answer on your device — fast and unique dives deepest!</p>
+    <button class="ghost" id="skip">End question now</button>
+  </section>
+
+  <!-- 4. Reveal -->
+  <section id="s-reveal" class="hidden">
+    <div class="row">
+      <div class="grow"><div class="muted" id="rnum"></div><div class="big" id="rtext"></div></div>
+      <button id="next">Next ▶</button>
+    </div>
+    <div class="card" id="bestBox"></div>
+    <div class="row" style="align-items:flex-start">
+      <div class="card grow" style="flex:1"><h3>Answers</h3><div id="buckets"></div></div>
+      <div class="grow" style="flex:2"><div class="ocean" id="ocean"></div></div>
+    </div>
+  </section>
+
+  <!-- 5. Game over -->
+  <section id="s-end" class="hidden center">
+    <div class="logo">🏆 Deepest Krill</div>
+    <div class="podium" id="podium"></div>
+    <div class="card" id="finalList" style="text-align:left"></div>
+    <button onclick="location.reload()">New game</button>
+  </section>
+
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function show(id) { document.querySelectorAll('section').forEach(s => s.classList.toggle('hidden', s.id !== id)); }
+
+// ---------- editor ----------
+const DEFAULT_QS = [
+  { text: 'Name a planet in our solar system', accepted: 'Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune', time: 20 },
+  { text: 'Name an animal that lives in the ocean', accepted: '', time: 25 },
+  { text: 'Name a prime number under 50', accepted: '2,3,5,7,11,13,17,19,23,29,31,37,41,43,47', time: 20 },
+];
+let qs;
+try { qs = JSON.parse(localStorage.getItem('krillion-qs')) || DEFAULT_QS; } catch { qs = DEFAULT_QS; }
+function save() { try { localStorage.setItem('krillion-qs', JSON.stringify(qs)); } catch {} }
+
+function renderEditor() {
+  $('qlist').innerHTML = qs.map((q, i) => `
+    <div class="card qitem" data-i="${i}">
+      <input data-f="text" placeholder="Question ${i + 1}" value="${esc(q.text)}">
+      <input data-f="accepted" placeholder="Accepted answers, comma separated (blank = any)" value="${esc(q.accepted)}">
+      <input data-f="time" type="number" min="5" max="120" title="Seconds" value="${q.time}">
+      <button class="danger" data-del="${i}" title="Delete">✕</button>
+    </div>`).join('');
+}
+$('qlist').addEventListener('input', e => {
+  const i = e.target.closest('[data-i]')?.dataset.i, f = e.target.dataset.f;
+  if (i == null || !f) return;
+  qs[i][f] = f === 'time' ? +e.target.value : e.target.value; save();
+});
+$('qlist').addEventListener('click', e => {
+  if (e.target.dataset.del == null) return;
+  qs.splice(+e.target.dataset.del, 1); save(); renderEditor();
+});
+$('add').onclick = () => { qs.push({ text: '', accepted: '', time: 20 }); save(); renderEditor(); };
+$('exportBtn').onclick = () => prompt('Copy your questions:', JSON.stringify(qs));
+$('importBtn').onclick = () => {
+  const t = prompt('Paste questions JSON:'); if (!t) return;
+  try { qs = JSON.parse(t); save(); renderEditor(); } catch { alert('Invalid JSON'); }
+};
+renderEditor();
+
+$('create').onclick = () => {
+  const payload = qs.map(q => ({ text: q.text, time: q.time, accepted: String(q.accepted || '').split(',').map(s => s.trim()).filter(Boolean) }));
+  socket.emit('host:create', payload, res => {
+    if (res.error) return $('editErr').textContent = res.error;
+    $('pin').textContent = res.code;
+    $('joinUrl').textContent = res.joinUrl.replace(/^http:\/\//, '');
+    show('s-lobby');
+  });
+};
+
+// ---------- lobby ----------
+socket.on('lobby', ({ players }) => {
+  $('pcount').textContent = players.length;
+  $('start').disabled = players.length === 0;
+  $('lobbyPlayers').innerHTML = players.map(p => `<span class="pill" style="cursor:pointer;${p.connected ? '' : 'opacity:.4'}" data-kick="${p.id}">🦐 ${esc(p.name)}</span>`).join('');
+});
+$('lobbyPlayers').onclick = e => { const id = e.target.dataset.kick; if (id && confirm('Remove this player?')) socket.emit('host:kick', id); };
+$('start').onclick = () => socket.emit('host:start');
+
+// ---------- question ----------
+let tick;
+socket.on('question', q => {
+  show('s-question');
+  $('qnum').textContent = `Question ${q.index + 1} of ${q.total}`;
+  $('qtext').textContent = q.text;
+  $('answered').textContent = 0;
+  clearInterval(tick);
+  const upd = () => { $('timer').textContent = Math.max(0, Math.ceil((q.endsAt - Date.now()) / 1000)); };
+  upd(); tick = setInterval(upd, 200);
+});
+socket.on('progress', p => $('answered').textContent = `${p.answered} / ${p.total}`);
+$('skip').onclick = () => socket.emit('host:skip');
+
+// ---------- reveal ----------
+const ZONES = [[0, '☀️ Sunlight Zone'], [200, '🌅 Twilight Zone'], [1000, '🌙 Midnight Zone'], [4000, '🕳️ Abyssal Zone'], [6000, '🌋 Hadal Zone']];
+function renderOcean(ranking) {
+  const max = Math.max(1200, ...ranking.map(r => r.depth)) * 1.12;
+  const n = ranking.length;
+  let html = ZONES.filter(([d]) => d < max).map(([d, name]) => `<div class="zone" style="top:${(d / max) * 100}%">${name} · ${d}m</div>`).join('');
+  // order lanes by name so krill keep their horizontal lane between rounds
+  const lanes = [...ranking].sort((a, b) => a.name.localeCompare(b.name));
+  html += lanes.map((r, i) => {
+    const x = n === 1 ? 50 : 8 + (84 * i) / (n - 1);
+    return `<div class="krill" data-id="${r.id}" style="left:${x}%;top:${Math.max(5, (r.depth / max) * 100)}%">
+      <span class="icon">🦐</span><span class="tag">${esc(r.name)} · ${r.depth}m</span>
+      ${r.lastGain ? `<div class="gain">▼ +${r.lastGain}m</div>` : ''}</div>`;
+  }).join('');
+  const oc = $('ocean');
+  // animate: start everyone at previous depth, then drop to new depth
+  const prev = {};
+  oc.querySelectorAll('.krill').forEach(k => prev[k.dataset.id] = k.style.top);
+  oc.innerHTML = html;
+  oc.querySelectorAll('.krill').forEach(k => {
+    const target = k.style.top; k.style.top = prev[k.dataset.id] || '5%';
+    requestAnimationFrame(() => requestAnimationFrame(() => k.style.top = target));
+  });
+}
+
+socket.on('reveal', r => {
+  clearInterval(tick);
+  show('s-reveal');
+  $('rnum').textContent = `Question ${r.index + 1} of ${r.total} · ${r.answeredCount} answered`;
+  $('rtext').textContent = r.text;
+  $('next').textContent = r.index >= r.total - 1 ? 'Final results 🏆' : 'Next question ▶';
+  $('bestBox').innerHTML = r.best
+    ? `<div class="big">🦐 <b>${esc(r.best.name)}</b> dove deepest with “${esc(r.best.answer)}” — ▼ ${r.best.gain}m</div>`
+    : `<div class="big">Nobody dove this round 🫧</div>`;
+  const maxC = Math.max(1, ...r.buckets.map(b => b.count));
+  $('buckets').innerHTML = r.buckets.length ? r.buckets.map(b => `
+    <div class="bar ${b.valid ? '' : 'invalid'}">
+      <div class="lbl" title="${esc(b.label)}">${b.valid ? '' : '✗ '}${esc(b.label)}</div>
+      <div class="fill" style="width:${(b.count / maxC) * 60}%"></div><b>${b.count}</b>
+    </div>`).join('') : '<p class="muted">No answers.</p>';
+  if (r.accepted.length) {
+    const used = new Set(r.buckets.filter(b => b.valid).map(b => b.label));
+    const unused = r.accepted.filter(a => !used.has(a));
+    if (unused.length) $('buckets').innerHTML += `<p class="muted">Nobody said: ${unused.map(esc).join(', ')}</p>`;
+  }
+  renderOcean(r.ranking);
+});
+$('next').onclick = () => socket.emit('host:next');
+
+// ---------- end ----------
+socket.on('gameover', ({ ranking }) => {
+  show('s-end');
+  const [a, b, c] = ranking;
+  const slot = (p, cls, medal) => p ? `<div class="${cls}"><div style="font-size:2.5rem">${medal}</div><b>${esc(p.name)}</b><div>${p.depth}m</div></div>` : '';
+  $('podium').innerHTML = slot(b, 'p2', '🥈') + slot(a, 'p1', '🥇') + slot(c, 'p3', '🥉');
+  $('finalList').innerHTML = ranking.map((p, i) => `<div class="bar"><b style="width:40px">#${i + 1}</b><span class="grow">${esc(p.name)}</span><b>${p.depth}m</b></div>`).join('');
+});
+</script>
+</body>
+</html>
