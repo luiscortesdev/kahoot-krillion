@@ -2,88 +2,96 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Krillion — Teacher</title>
+<title>Kahootrillion — Teacher</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<div class="wrap">
+
+<main class="wrap">
 
   <!-- 1. Question editor -->
   <section id="s-edit">
-    <div class="logo center">🦐 Krill<span>ion</span></div>
-    <p class="center muted">Rare answers + fast answers = deeper dives. Deepest krill wins.</p>
+    <div class="center" style="margin-top:4vh">
+      <div class="logo"><img src="/krill.png" alt="">Kahoot<span>rillion</span></div>
+      <div class="tagline" style="margin-top:10px">Rare + fast = deep. Deepest krill wins.</div>
+    </div>
     <div class="card">
       <h2>Your questions</h2>
-      <p class="muted">Ask open-ended questions with many possible answers (e.g. "Name a planet"). List the accepted answers separated by commas — or leave it blank to accept anything. Players who give an answer nobody else gave sink the deepest.</p>
+      <p class="muted" style="max-width:70ch">Ask open-ended questions with lots of possible answers ("Name a planet"). List accepted answers separated by commas, or leave it blank to accept anything. Answers nobody else gave sink the deepest.</p>
+      <div class="edit-head label"><span>#</span><span>Question</span><span>Accepted answers</span><span>Seconds</span><span></span></div>
       <div id="qlist"></div>
-      <div class="row" style="margin-top:12px">
+      <div class="row" style="margin-top:14px">
         <button class="ghost" id="add">+ Add question</button>
-        <button class="ghost" id="exportBtn">Export</button>
-        <button class="ghost" id="importBtn">Import</button>
+        <button class="ghost" id="exportBtn">Save to file</button>
+        <button class="ghost" id="importBtn">Load from file</button>
+        <input type="file" id="importFile" accept=".json,application/json" hidden>
         <div class="grow"></div>
         <button id="create">Create game ▶</button>
       </div>
-      <div class="err" id="editErr"></div>
+      <div class="err" id="editErr" role="alert"></div>
     </div>
   </section>
 
   <!-- 2. Lobby -->
   <section id="s-lobby" class="hidden center">
     <div class="card">
-      <div class="big">Join at <span id="joinUrl" style="color:#fde68a"></span></div>
-      <div class="muted">Game PIN:</div>
+      <div class="label">Join at</div>
+      <div class="big num" id="joinUrl" style="color:var(--signal)"></div>
+      <div class="label" style="margin-top:16px">Game PIN</div>
       <div class="huge" id="pin"></div>
     </div>
-    <div class="row" style="justify-content:center">
-      <div class="big"><span id="pcount">0</span> krill in the swarm</div>
+    <div class="row" style="justify-content:space-between;margin-top:6px">
+      <div class="big"><span id="pcount" class="num hl">0</span> krill in the swarm</div>
       <button id="start" disabled>Start dive ▶</button>
     </div>
-    <div id="lobbyPlayers" class="card" style="min-height:120px"></div>
+    <div class="card"><div id="lobbyPlayers" class="pills"><p class="muted">Waiting for players…</p></div></div>
     <p class="muted">Click a name to remove a player.</p>
   </section>
 
   <!-- 3. Question -->
   <section id="s-question" class="hidden center">
-    <div class="muted" id="qnum"></div>
-    <div class="card"><div class="big" id="qtext"></div></div>
+    <div class="label" id="qnum" style="margin-top:3vh"></div>
+    <div class="card"><div class="big" id="qtext" style="font-size:clamp(1.8rem,4.5vw,3.4rem)"></div></div>
     <div class="timer" id="timer"></div>
-    <p class="big"><span id="answered">0</span> answers in</p>
-    <p class="muted">Type your rarest answer on your device — fast and unique dives deepest!</p>
+    <p class="big"><span id="answered" class="num hl">0</span> answers in</p>
+    <p class="muted">Answer on your device. Rare and fast sinks deepest.</p>
     <button class="ghost" id="skip">End question now</button>
   </section>
 
   <!-- 4. Reveal -->
   <section id="s-reveal" class="hidden">
     <div class="row">
-      <div class="grow"><div class="muted" id="rnum"></div><div class="big" id="rtext"></div></div>
-      <span class="muted" id="autoNext"></span>
-      <button class="ghost" id="pause">⏸ Pause</button>
+      <div class="grow"><div class="label" id="rnum"></div><div class="big" id="rtext"></div></div>
+      <span class="label" id="autoNext"></span>
+      <button class="ghost" id="pause">Pause</button>
       <button id="next">Next ▶</button>
     </div>
-    <div class="card" id="bestBox"></div>
+    <div class="card best" id="bestBox"></div>
     <div class="row" style="align-items:flex-start">
-      <div class="card grow" style="flex:1"><h3>Answers</h3><div id="buckets"></div></div>
+      <div class="card grow" style="flex:1;margin-top:0"><h3>Answers</h3><div id="buckets"></div></div>
       <div class="grow" style="flex:2"><div class="ocean" id="ocean"></div></div>
     </div>
   </section>
 
   <!-- 5. Game over -->
   <section id="s-end" class="hidden center">
-    <div class="logo">🏆 Deepest Krill</div>
+    <div class="tagline" style="margin-top:4vh">Final standings</div>
+    <div class="logo">Deepest Krill</div>
     <div class="podium" id="podium"></div>
-    <div class="card" id="finalList" style="text-align:left"></div>
+    <div class="card" id="finalList" style="text-align:left;margin-top:0;border-radius:0 0 6px 6px"></div>
     <button onclick="location.reload()">New game</button>
   </section>
 
-</div>
+</main>
 <script src="/socket.io/socket.io.js"></script>
 <script src="/sfx.js"></script>
 <script>
 const socket = io();
-SFX.addToggle();
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const KRILL = '<img src="/krill.png" alt="">';
 function show(id) { document.querySelectorAll('section').forEach(s => s.classList.toggle('hidden', s.id !== id)); }
+SFX.addToggle();
 
 // ---------- editor ----------
 const DEFAULT_QS = [
@@ -97,11 +105,12 @@ function save() { try { localStorage.setItem('krillion-qs', JSON.stringify(qs));
 
 function renderEditor() {
   $('qlist').innerHTML = qs.map((q, i) => `
-    <div class="card qitem" data-i="${i}">
-      <input data-f="text" placeholder="Question ${i + 1}" value="${esc(q.text)}">
-      <input data-f="accepted" placeholder="Accepted answers, comma separated (blank = any)" value="${esc(q.accepted)}">
-      <input data-f="time" type="number" min="5" max="120" title="Seconds" value="${q.time}">
-      <button class="danger" data-del="${i}" title="Delete">✕</button>
+    <div class="card flat qitem" data-i="${i}">
+      <span class="qn">${i + 1}</span>
+      <input data-f="text" placeholder="Question ${i + 1}" aria-label="Question ${i + 1}" value="${esc(q.text)}">
+      <input data-f="accepted" placeholder="Accepted answers, comma separated (blank = any)" aria-label="Accepted answers" value="${esc(q.accepted)}">
+      <input data-f="time" type="number" min="5" max="120" title="Seconds" aria-label="Seconds" value="${q.time}">
+      <button class="danger" data-del="${i}" title="Delete question" aria-label="Delete question ${i + 1}">✕</button>
     </div>`).join('');
 }
 $('qlist').addEventListener('input', e => {
@@ -113,11 +122,21 @@ $('qlist').addEventListener('click', e => {
   if (e.target.dataset.del == null) return;
   qs.splice(+e.target.dataset.del, 1); save(); renderEditor();
 });
-$('add').onclick = () => { qs.push({ text: '', accepted: '', time: 20 }); save(); renderEditor(); };
-$('exportBtn').onclick = () => prompt('Copy your questions:', JSON.stringify(qs));
-$('importBtn').onclick = () => {
-  const t = prompt('Paste questions JSON:'); if (!t) return;
-  try { qs = JSON.parse(t); save(); renderEditor(); } catch { alert('Invalid JSON'); }
+$('add').onclick = () => { qs.push({ text: '', accepted: '', time: 20 }); save(); renderEditor(); $('qlist').lastElementChild.querySelector('input').focus(); };
+$('exportBtn').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(qs, null, 2)], { type: 'application/json' }));
+  a.download = 'kahootrillion-questions.json'; a.click(); URL.revokeObjectURL(a.href);
+};
+$('importBtn').onclick = () => $('importFile').click();
+$('importFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    if (!Array.isArray(data)) throw 0;
+    qs = data.map(q => ({ text: String(q.text || ''), accepted: Array.isArray(q.accepted) ? q.accepted.join(', ') : String(q.accepted || ''), time: +q.time || 20 }));
+    save(); renderEditor(); $('editErr').textContent = '';
+  } catch { $('editErr').textContent = "That file isn't a Kahootrillion question list."; }
 };
 renderEditor();
 
@@ -132,13 +151,15 @@ $('create').onclick = () => {
 };
 
 // ---------- lobby ----------
-let lobbyCount = 0;
+let lastCount = 0;
 socket.on('lobby', ({ players }) => {
-  if (players.length > lobbyCount && !$('s-lobby').classList.contains('hidden')) SFX.play('jump'); // a krill joined
-  lobbyCount = players.length;
   $('pcount').textContent = players.length;
   $('start').disabled = players.length === 0;
-  $('lobbyPlayers').innerHTML = players.map(p => `<span class="pill" style="cursor:pointer;${p.connected ? '' : 'opacity:.4'}" data-kick="${p.id}">🦐 ${esc(p.name)}</span>`).join('');
+  if (players.length > lastCount) SFX.play("jump");
+  lastCount = players.length;
+  $('lobbyPlayers').innerHTML = players.length
+    ? players.map(p => `<span class="pill kick${p.connected ? '' : ' off'}" data-kick="${p.id}" title="Remove ${esc(p.name)}">${esc(p.name)}</span>`).join('')
+    : '<p class="muted">Waiting for players…</p>';
 });
 $('lobbyPlayers').onclick = e => { const id = e.target.dataset.kick; if (id && confirm('Remove this player?')) socket.emit('host:kick', id); };
 $('start').onclick = () => socket.emit('host:start');
@@ -151,14 +172,19 @@ socket.on('question', q => {
   $('qtext').textContent = q.text;
   $('answered').textContent = 0;
   clearInterval(tick);
-  const upd = () => { $('timer').textContent = Math.max(0, Math.ceil((q.endsAt - Date.now()) / 1000)); };
-  upd(); tick = setInterval(upd, 200);
+  const upd = () => {
+    const left = Math.max(0, (q.endsAt - Date.now()) / 1000), sec = Math.ceil(left), t = $('timer');
+    t.textContent = sec;
+    t.style.setProperty('--p', left / q.time);
+    t.classList.toggle('urgent', left <= 5);
+  };
+  upd(); tick = setInterval(upd, 100);
 });
 socket.on('progress', p => $('answered').textContent = `${p.answered} / ${p.total}`);
 $('skip').onclick = () => socket.emit('host:skip');
 
 // ---------- reveal ----------
-const ZONES = [[0, '☀️ Sunlight Zone'], [200, '🌅 Twilight Zone'], [1000, '🌙 Midnight Zone'], [4000, '🕳️ Abyssal Zone'], [6000, '🌋 Hadal Zone']];
+const ZONES = [[0, 'Sunlight zone'], [200, 'Twilight zone'], [1000, 'Midnight zone'], [4000, 'Abyssal zone'], [6000, 'Hadal zone']];
 function renderOcean(ranking) {
   const max = Math.max(1200, ...ranking.map(r => r.depth)) * 1.12;
   const n = ranking.length;
@@ -168,8 +194,8 @@ function renderOcean(ranking) {
   html += lanes.map((r, i) => {
     const x = n === 1 ? 50 : 8 + (84 * i) / (n - 1);
     return `<div class="krill" data-id="${r.id}" style="left:${x}%;top:${Math.max(5, (r.depth / max) * 100)}%">
-      <span class="icon">🦐</span><span class="tag">${esc(r.name)} · ${r.depth}m</span>
-      ${r.lastGain ? `<div class="gain">▼ +${r.lastGain}m</div>` : ''}</div>`;
+      <span class="bob" style="display:block;animation-delay:-${(i * 0.37) % 2.4}s">${KRILL}</span><span class="tag">${esc(r.name)} · ${r.depth}m</span>
+      ${r.lastGain ? `<div class="gain">▼ ${r.lastGain}m</div>` : ''}</div>`;
   }).join('');
   const oc = $('ocean');
   // animate: start everyone at previous depth, then drop to new depth
@@ -185,17 +211,18 @@ function renderOcean(ranking) {
 socket.on('reveal', r => {
   clearInterval(tick);
   show('s-reveal');
+  SFX.play(r.best ? "explosion" : "death");
   $('rnum').textContent = `Question ${r.index + 1} of ${r.total} · ${r.answeredCount} answered`;
   $('rtext').textContent = r.text;
-  $('next').textContent = r.index >= r.total - 1 ? 'Final results 🏆' : 'Next question ▶';
+  $('next').textContent = r.index >= r.total - 1 ? 'Final results ▶' : 'Next question ▶';
   $('bestBox').innerHTML = r.best
-    ? `<div class="big">🦐 <b>${esc(r.best.name)}</b> dove deepest with “${esc(r.best.answer)}” — ▼ ${r.best.gain}m</div>`
-    : `<div class="big">Nobody dove this round 🫧</div>`;
+    ? `<div><div class="label">Deepest dive this round</div><div class="big"><b>${esc(r.best.name)}</b> with “${esc(r.best.answer)}” <span class="num" style="color:var(--signal)">▼ ${r.best.gain}m</span></div></div>`
+    : `<div class="big">Nobody dove this round.</div>`;
   const maxC = Math.max(1, ...r.buckets.map(b => b.count));
   $('buckets').innerHTML = r.buckets.length ? r.buckets.map(b => `
     <div class="bar ${b.valid ? '' : 'invalid'}">
-      <div class="lbl" title="${esc(b.label)}">${b.valid ? '' : '✗ '}${esc(b.label)}</div>
-      <div class="fill" style="width:${(b.count / maxC) * 60}%"></div><b>${b.count}</b>
+      <div class="lbl" title="${esc(b.label)}">${esc(b.label)}</div>
+      <div class="fill" style="width:${(b.count / maxC) * 60}%"></div><b class="count">${b.count}</b>
     </div>`).join('') : '<p class="muted">No answers.</p>';
   if (r.accepted.length) {
     const used = new Set(r.buckets.filter(b => b.valid).map(b => b.label));
@@ -203,18 +230,17 @@ socket.on('reveal', r => {
     if (unused.length) $('buckets').innerHTML += `<p class="muted">Nobody said: ${unused.map(esc).join(', ')}</p>`;
   }
   renderOcean(r.ranking);
-  SFX.play(r.best ? 'explosion' : 'death'); // splash as krill dive, or a sad sound if nobody did
   // countdown until the game auto-continues
   const what = r.index >= r.total - 1 ? 'Final results' : 'Next question';
   $('pause').classList.remove('hidden');
-  const upd = () => { $('autoNext').textContent = `${what} in ${Math.max(0, Math.ceil((r.nextAt - Date.now()) / 1000))}s`; };
-  upd(); tick = setInterval(upd, 200);
+  const updNext = () => { $('autoNext').textContent = `${what} in ${Math.max(0, Math.ceil((r.nextAt - Date.now()) / 1000))}s`; };
+  updNext(); tick = setInterval(updNext, 200);
 });
 $('next').onclick = () => socket.emit('host:next');
 $('pause').onclick = () => {
   socket.emit('host:pause');
   clearInterval(tick);
-  $('autoNext').textContent = 'Paused — click Next when ready';
+  $('autoNext').textContent = 'Paused. Click Next when ready';
   $('pause').classList.add('hidden');
 };
 
@@ -222,11 +248,11 @@ $('pause').onclick = () => {
 socket.on('gameover', ({ ranking }) => {
   clearInterval(tick);
   show('s-end');
-  SFX.play('gameover');
+  SFX.play("gameover");
   const [a, b, c] = ranking;
-  const slot = (p, cls, medal) => p ? `<div class="${cls}"><div style="font-size:2.5rem">${medal}</div><b>${esc(p.name)}</b><div>${p.depth}m</div></div>` : '';
-  $('podium').innerHTML = slot(b, 'p2', '🥈') + slot(a, 'p1', '🥇') + slot(c, 'p3', '🥉');
-  $('finalList').innerHTML = ranking.map((p, i) => `<div class="bar"><b style="width:40px">#${i + 1}</b><span class="grow">${esc(p.name)}</span><b>${p.depth}m</b></div>`).join('');
+  const slot = (p, cls, rank) => p ? `<div class="${cls}"><div class="rank">${rank}</div><div class="name">${esc(p.name)}</div><div class="num">${p.depth}m</div></div>` : '';
+  $('podium').innerHTML = slot(b, 'p2', 2) + slot(a, 'p1', 1) + slot(c, 'p3', 3);
+  $('finalList').innerHTML = ranking.map((p, i) => `<div class="standing"><b>#${i + 1}</b><span class="grow">${esc(p.name)}</span><b class="num">${p.depth}m</b></div>`).join('');
 });
 </script>
 </body>

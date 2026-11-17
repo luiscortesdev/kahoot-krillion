@@ -23,9 +23,8 @@ const SFX = (() => {
   // Adds a small speaker toggle in the corner
   function addToggle() {
     const b = document.createElement('button');
-    b.className = 'ghost';
-    b.style.cssText = 'position:fixed;top:10px;right:10px;z-index:10;padding:8px 12px';
-    const label = () => b.textContent = muted ? '🔇' : '🔊';
+    b.className = 'mute';
+    const label = () => b.textContent = muted ? 'Sound off' : 'Sound on';
     b.title = 'Sound on/off';
     b.onclick = () => { setMuted(!muted); label(); if (!muted) play('jump'); };
     label();

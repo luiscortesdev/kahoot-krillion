@@ -1,4 +1,4 @@
-# 🦐 Krillion
+# Kahootrillion
 
 Kahoot-style classroom game: the rarest answer, given fastest, sinks your krill deepest. Deepest krill wins.
 
