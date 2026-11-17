@@ -1,4 +1,4 @@
-// Krillion — a Kahoot-style classroom game where rare + fast answers sink you deepest.
+// Kahootrillion — a Kahoot-style classroom game where rare + fast answers sink you deepest.
 const express = require('express');
 const http = require('http');
 const os = require('os');
@@ -215,7 +215,7 @@ io.on('connection', socket => {
 });
 
 server.listen(PORT, () => {
-  console.log(`\n  Krillion running!`);
+  console.log(`\n  Kahootrillion running!`);
   console.log(`  Teacher screen:  http://localhost:${PORT}/host`);
   console.log(`  Students join:   http://${lanAddress()}:${PORT}\n`);
 });

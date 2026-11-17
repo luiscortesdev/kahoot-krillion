@@ -2,74 +2,82 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Krillion — Join</title>
+<meta name="theme-color" content="#0b1d2a">
+<title>Kahootrillion — Join</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<div class="wrap center" style="max-width:520px">
+<button class="mute" id="mute"></button>
+
+<main class="wrap narrow center">
 
   <section id="s-join">
-    <div class="logo" style="margin-top:8vh">🦐 Krill<span>ion</span></div>
+    <div style="margin-top:9vh"><div class="logo"><img src="/krill.png" alt="">Kahoot<span>rillion</span></div></div>
+    <div class="tagline" style="margin-top:10px">Say something nobody else will</div>
     <div class="card">
-      <input id="code" inputmode="numeric" maxlength="6" placeholder="Game PIN" style="text-align:center;font-size:1.6rem;font-weight:800">
-      <div style="height:10px"></div>
-      <input id="name" maxlength="16" placeholder="Nickname" style="text-align:center;font-size:1.3rem">
-      <div style="height:12px"></div>
-      <button id="join" style="width:100%">Dive in!</button>
-      <div class="err" id="joinErr"></div>
+      <label class="label" for="code">Game PIN</label>
+      <input id="code" class="pin" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="000000">
+      <div class="spacer"></div>
+      <label class="label" for="name">Nickname</label>
+      <input id="name" class="nick" maxlength="16" autocomplete="off" placeholder="e.g. Captain Krill">
+      <div class="spacer"></div>
+      <button id="join" class="wide">Dive in</button>
+      <div class="err" id="joinErr" role="alert"></div>
     </div>
-    <a href="/host" class="muted" style="color:inherit">I'm the teacher →</a>
+    <a href="/host" class="link">I'm the teacher →</a>
   </section>
 
   <section id="s-wait" class="hidden">
-    <div style="font-size:5rem;margin-top:12vh" class="krillbob">🦐</div>
-    <div class="big">You're in, <span id="me"></span>!</div>
-    <p class="muted" id="waitMsg">See your name on the big screen? Waiting for the teacher to start…</p>
+    <img class="hero-krill bob" src="/krill.png" alt="">
+    <div class="big">You're in, <span id="me" class="hl"></span>.</div>
+    <p class="muted">Find your name on the big screen. The dive starts when your teacher says go.</p>
   </section>
 
   <section id="s-question" class="hidden">
-    <div class="muted" id="qnum"></div>
+    <div class="label" id="qnum" style="margin-top:12px"></div>
     <div class="card"><div class="big" id="qtext"></div></div>
-    <div class="timer" id="timer" style="width:80px;height:80px;font-size:2rem"></div>
+    <div class="timer small" id="timer"></div>
     <div class="card">
-      <input id="answer" maxlength="60" placeholder="Your rarest answer…" autocomplete="off" style="font-size:1.3rem;text-align:center">
-      <div style="height:10px"></div>
-      <button id="send" style="width:100%">Submit</button>
+      <input id="answer" maxlength="60" placeholder="Your rarest answer" autocomplete="off" aria-label="Your answer" style="font-size:1.3rem;text-align:center">
+      <div class="spacer"></div>
+      <button id="send" class="wide">Lock it in</button>
     </div>
-    <p class="muted">Think of something nobody else will say — and be quick!</p>
+    <p class="muted">Rare beats common. Fast beats slow.</p>
   </section>
 
   <section id="s-sent" class="hidden">
-    <div style="font-size:4rem;margin-top:12vh">🫧</div>
-    <div class="big">Answer locked in!</div>
-    <p class="muted">Hoping you're the only one who said it…</p>
+    <img class="hero-krill sink" src="/krill.png" alt="">
+    <div class="big">Locked in.</div>
+    <p class="muted">Now hope nobody else thought of it…</p>
   </section>
 
   <section id="s-result" class="hidden">
-    <div style="font-size:4rem;margin-top:8vh" id="rIcon"></div>
-    <div class="big" id="rHead"></div>
+    <div class="stamp" id="rStamp"></div>
+    <div class="big" id="rHead" style="margin-top:18px"></div>
+    <p class="muted" id="rDetail"></p>
     <div class="card">
-      <div id="rDetail"></div>
-      <div class="huge" style="font-size:3rem" id="rDepth"></div>
-      <div class="muted">total depth</div>
-      <div class="big" id="rRank"></div>
+      <div class="label">Total depth</div>
+      <div class="huge num" style="font-size:3.2rem" id="rDepth"></div>
+      <div class="big" id="rRank" style="font-size:1.4rem;margin-top:8px"></div>
     </div>
-    <p class="muted">Eyes on the big screen!</p>
+    <p class="muted">Eyes on the big screen.</p>
   </section>
 
   <section id="s-end" class="hidden">
-    <div style="font-size:5rem;margin-top:10vh" id="eIcon"></div>
-    <div class="big" id="eHead"></div>
-    <div class="card"><div class="huge" style="font-size:3rem" id="eDepth"></div><div class="muted">final depth</div></div>
+    <div class="stamp good" id="eStamp"></div>
+    <div class="big" id="eHead" style="margin-top:18px"></div>
+    <div class="card"><div class="label">Final depth</div><div class="huge num" style="font-size:3.2rem" id="eDepth"></div></div>
     <button onclick="location.reload()">Play again</button>
   </section>
 
-</div>
+</main>
 <script src="/socket.io/socket.io.js"></script>
+<script src="/sfx.js"></script>
 <script>
 const socket = io();
 const $ = id => document.getElementById(id);
 function show(id) { document.querySelectorAll('section').forEach(s => s.classList.toggle('hidden', s.id !== id)); }
+Sfx.bindMute($('mute'));
 let myName = '', joined = null;
 
 const params = new URLSearchParams(location.search);
@@ -78,10 +86,11 @@ try { $('name').value = localStorage.getItem('krillion-name') || ''; } catch {}
 
 function join(code, name) {
   socket.emit('player:join', { code, name }, res => {
-    if (res.error) { show('s-join'); return $('joinErr').textContent = res.error; }
+    if (res.error) { show('s-join'); Sfx.buzz(); return $('joinErr').textContent = res.error; }
     myName = res.name; joined = { code, name };
     try { localStorage.setItem('krillion-name', name); } catch {}
-    $('me').textContent = myName;
+    $('me').textContent = myName; $('joinErr').textContent = '';
+    Sfx.pop();
     show('s-wait');
   });
 }
@@ -100,8 +109,13 @@ socket.on('question', q => {
   $('answer').value = ''; $('send').disabled = false;
   setTimeout(() => $('answer').focus(), 50);
   clearInterval(tick);
-  const upd = () => { $('timer').textContent = Math.max(0, Math.ceil((q.endsAt - Date.now()) / 1000)); };
-  upd(); tick = setInterval(upd, 200);
+  const upd = () => {
+    const left = Math.max(0, (q.endsAt - Date.now()) / 1000), t = $('timer');
+    t.textContent = Math.ceil(left);
+    t.style.setProperty('--p', left / q.time);
+    t.classList.toggle('urgent', left <= 5);
+  };
+  upd(); tick = setInterval(upd, 100);
 });
 function send() {
   const a = $('answer').value.trim(); if (!a) return;
@@ -110,17 +124,19 @@ function send() {
 }
 $('send').onclick = send;
 $('answer').onkeydown = e => { if (e.key === 'Enter') send(); };
-socket.on('answered', () => show('s-sent'));
+socket.on('answered', () => { Sfx.pop(); show('s-sent'); });
 
 socket.on('result', r => {
   clearInterval(tick);
   show('s-result');
-  if (!r.answer) { $('rIcon').textContent = '⏰'; $('rHead').textContent = 'No answer!'; $('rDetail').textContent = 'You floated in place.'; }
-  else if (!r.valid) { $('rIcon').textContent = '❌'; $('rHead').textContent = 'Not an accepted answer'; $('rDetail').textContent = `“${r.answer}” didn't count.`; }
+  const stamp = (text, good) => { $('rStamp').textContent = text; $('rStamp').className = 'stamp ' + (good ? 'good' : 'bad'); };
+  if (!r.answer) { stamp("Time's up", false); $('rHead').textContent = 'No answer'; $('rDetail').textContent = 'You floated in place this round.'; Sfx.buzz(); }
+  else if (!r.valid) { stamp('Not accepted', false); $('rHead').textContent = `“${r.answer}”`; $('rDetail').textContent = "That one didn't count."; Sfx.buzz(); }
   else {
-    $('rIcon').textContent = r.sameCount === 1 ? '💎' : '🦐';
-    $('rHead').textContent = `▼ +${r.gain}m`;
-    $('rDetail').textContent = r.sameCount === 1 ? `Only YOU said “${r.answer}”!` : `${r.sameCount} krill said “${r.answer}”`;
+    stamp(r.sameCount === 1 ? 'Only you' : `${r.sameCount} said it`, true);
+    $('rHead').textContent = `▼ ${r.gain}m deeper`;
+    $('rDetail').textContent = r.sameCount === 1 ? `Nobody else said “${r.answer}”.` : `${r.sameCount} krill said “${r.answer}”.`;
+    r.sameCount === 1 ? Sfx.ping() : Sfx.bloop();
   }
   $('rDepth').textContent = `${r.depth}m`;
   $('rRank').textContent = `#${r.rank} of ${r.of}`;
@@ -130,9 +146,10 @@ socket.on('gameover', ({ ranking }) => {
   show('s-end');
   const i = ranking.findIndex(p => p.name === myName);
   const me = ranking[i];
-  $('eIcon').textContent = ['🥇', '🥈', '🥉'][i] || '🦐';
-  $('eHead').textContent = i === 0 ? 'You are the DEEPEST KRILL!' : `You finished #${i + 1} of ${ranking.length}`;
+  $('eStamp').textContent = i === 0 ? 'Deepest krill' : `#${i + 1} of ${ranking.length}`;
+  $('eHead').textContent = i === 0 ? 'Nobody went deeper.' : i < 3 ? 'On the podium.' : 'Good dive.';
   $('eDepth').textContent = me ? `${me.depth}m` : '';
+  i >= 0 && i < 3 ? Sfx.win() : Sfx.bloop();
 });
 
 socket.on('kicked', () => { joined = null; show('s-join'); $('joinErr').textContent = 'You were removed by the teacher.'; });
